@@ -1,7 +1,7 @@
 
 ## What is it?
 
-This is a script that is a wrapper around [wfuzz](https://github.com/xmendez/wfuzz) that uses by default wordlists provided from [SecLists](https://github.com/danielmiessler/SecLists) and leveraging **Johb the Ripper** during custom wordlist generation.
+This is a script that is a wrapper around [wfuzz](https://github.com/xmendez/wfuzz) that uses by default wordlists provided from [SecLists](https://github.com/danielmiessler/SecLists) and leveraging **John the Ripper** during custom wordlist generation.
 
 The script has been implemented after tons of wfuzz, dirb and other dirbusting tools launching from command line by hand, with time spent to every time look on tools usage informations and choosing proper wordlist files to use this very time.
 
@@ -13,7 +13,8 @@ It is intended to be used for quick launch from command line during a penetratio
 Dirbusting of web application "www.example.com" with couple of custom words to be used for custom wordlist generation and with redefined HTTP Status codes to skip.
 
 ```
-work|21:11|~/tools/dirbust # ./dirbuster.sh -H "301,302,401,404,410" -c example,backup,test,database,db -o ~/work/example/logs/dirbust1.txt www.example.com
+work|21:11|~/tools/dirbust # ./dirbuster.sh -H "301,302,401,404,410" \
+		-c example,backup,test,database,db -o ~/work/example/logs/dirbust1.txt www.example.com
 
 	.:: wfuzz and SecLists based dirbusting script ::.
 	    To be used for quick dir busting pentest task
