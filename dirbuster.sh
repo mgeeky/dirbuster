@@ -172,6 +172,7 @@ function files_scan {
 .asp
 .aspx
 .ashx
+.asmx
 .cgi
 .htm
 .html
