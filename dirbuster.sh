@@ -125,7 +125,6 @@ function directories_scan {
     local quick_scan_lists=(
         "$SECLISTS_PATH/Discovery/Web_Content/common.txt"
         "$SECLISTS_PATH/Discovery/Web_Content/SVNDigger/all-dirs.txt"
-        "$SECLISTS_PATH/Discovery/Web_Content/raft-small-directories.txt"
     )
 
     local full_scan_lists=(
