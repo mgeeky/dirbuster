@@ -289,7 +289,7 @@ do
                 shift
             ;;
 
-            -W|--wordlist)
+            -w|--wordlist)
                 ADDITIONAL_WORDLIST="$2"
                 shift
             ;;
