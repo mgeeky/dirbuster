@@ -21,7 +21,7 @@
 #   SCRIPT CONFIGURATION
 
 # HTTP Status codes to from results.
-DEFAULT_SHOW_CODES="200,204,301,302,307"
+DEFAULT_SHOW_CODES="100,101,102,200,201,202,204,205,302,307,308,401,403,405,406,418,500"
 
 # Directory where SecLists repository has been placed.
 SECLISTS_PATH=/root/data/SecLists
@@ -99,7 +99,7 @@ function scan {
         additional="$additional"
     fi
 
-    local cmd="$GOBUSTER_PATH -a '$USER_AGENT' -l -t 20 $additional -s $show_codes $wordlists -k -u '$1'"
+    local cmd="$GOBUSTER_PATH -a '$USER_AGENT' -l -t 20 $additional -s $show_codes $wordlists -q -k -u '$1'"
 
     echo
     echo "== Running forceful browsing scan"
