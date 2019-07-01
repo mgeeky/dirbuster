@@ -44,6 +44,7 @@ USER_AGENT='Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:64.0) Gecko/20100101 Fire
 # ==============================================
 
 FULL_MODE=0
+DUMP_FILE=""
 NUM_OF_SCAN=0
 USER_SHOW_CODES=""
 REQUEST_DELAY=0.02
@@ -66,7 +67,34 @@ function usage {
     echo -e "\t-H <codes>, --showcode <codes>\t\tHTTP Status-codes deemed to be positive."
     echo -e "\t-d <delay>, --delay <delay>\t\tDelay between consecutive requests in seconds. (default: $REQUEST_DELAY seconds.)"
     echo -e "\t-A <gobuster>, --additional <gobuster>\tAdditional 'gobuster' custom options to use."
+    echo -e "\t-D <outfile>, --dump-wordlist <outfile>\tDon't do directory busting, only dump generated wordlists to an <outfile>. Caution: outfile will be overwritten."
     echo
+}
+
+function product {
+    local filenames=$1
+    local extensions=$2
+    local outfile=$3
+
+    python - <<-EOF
+from itertools import product
+import os.path
+with open('$filenames','r') as f: 
+    with open('$extensions','r') as g: 
+        with open('$outfile','w') as h: 
+            filenames = [x.strip() for x in f.readlines()]
+            extensions = [x.strip() for x in g.readlines()]
+            outs = set()
+            for filename, extension in product(filenames, extensions): 
+                res = filename+extension
+                if len(res.split('.')) == 2:
+                    o = '{}{}'.format(filename, extension).replace('..','.')
+                else:
+                    o = filename
+                if o not in outs:
+                    h.write(o + '\n')
+                    outs.add(o)
+EOF
 }
 
 function scan {
@@ -78,27 +106,63 @@ function scan {
     fi
 
     local wordlists=""
-    local additional="-m chain"
+    local additional=""
     local secondwordlist=""
     local num_of_requests=1
 
     for w in $2
     do
         wordlists="$wordlists -w $w"
-        num_of_requests=$(( $num_of_requests + $(wc -l "$w" | awk '{print $1}') ))
     done
 
+    additional_files=()
     additional="$ADDITIONAL_GOBUSTER_OPTIONS"
     if [[ ! -z "$3" ]]; then
         secondwordlist="$3"
-        num_of_requests=$(( $(wc -l "$2" | awk '{print $1}') * $(wc -l "$3" | awk '{print $1}') ))
-		additional="$additional -x $secondwordlist"
+        newwordlists=""
+        for w in $wordlists
+        do
+            if [ -f "$w" ]; then
+                local outfile=/tmp/dirbust.product.$RANDOM.$RANDOM.txt
+                product $w $secondwordlist $outfile
+                additional_files+=($outfile)
+                newwordlists="$newwordlists $outfile"
+            fi
+        done
+
+        wordlists="$newwordlists"
     fi
 
-    if [ $FULL_MODE -eq 1 ]; then
-        additional="$additional"
-    fi
+<<<<<<< HEAD
+    # Generates unique wordlists
+    local tmp=/tmp/dirbust.wordlist.$RANDOM.$RANDOM.txt
+    touch $tmp
+    for w in $wordlists
+    do
+        if [ -f "$w" ]; then
+            cat "$w" | sort -u >> $tmp
+        fi
+    done
 
+    local tmp2=/tmp/dirbust.wordlist.$RANDOM.$RANDOM.txt
+    cat "$tmp" | sort -u > $tmp2
+    rm $tmp
+
+    wordlists="$tmp2"
+    num_of_requests=$(wc -l "$tmp2")
+
+    if [[ ! -z "$DUMP_FILE" ]]; then
+        for w in $wordlists
+        do
+            if [ -f "$w" ]; then
+                echo "[.] Dumping $w to outfile..."
+                cat $w >> $DUMP_FILE
+            fi
+        done
+        return
+    fi
+=======
+>>>>>>> 407c339c7534e07782001709410720124679f87b
     local cmd="$GOBUSTER_PATH -a '$USER_AGENT' -l -t 20 $additional -s $show_codes $wordlists -q -k -u '$1'"
 
     echo
@@ -130,12 +194,10 @@ function prefilter_wordlists {
 function directories_scan {
     local quick_scan_lists=(
         "$SECLISTS_PATH/Discovery/Web-Content/common.txt"
-        #"$SECLISTS_PATH/Discovery/Web-Content/SVNDigger/all-dirs.txt"
     )
 
     local full_scan_lists=(
         "$SECLISTS_PATH/Discovery/Web-Content/common.txt"
-        "$SECLISTS_PATH/Discovery/Web-Content/SVNDigger/all-dirs.txt"
         "$SECLISTS_PATH/Discovery/Web-Content/raft-medium-directories.txt"
     )
 
@@ -155,21 +217,15 @@ function directories_scan {
 
     wordlists=$(prefilter_wordlists $wordlists)
     scan "$URL/" "$wordlists"
-    
-    if [[ $wordlists == "/tmp/dirbust.wordlists."* ]]
-    then
-        echo "Removing temporary wordlist: $wordlists"
-        rm $wordlists
-    fi
 }
 
 function files_scan {
     local quick_scan_lists=(
-        "$SECLISTS_PATH/Discovery/Web-Content/raft-small-files.txt"
+        "$SECLISTS_PATH/Discovery/Web-Content/raft-small-words.txt"
     )
 
     local full_scan_lists=(
-        "$SECLISTS_PATH/Discovery/Web-Content/raft-large-files.txt"
+        "$SECLISTS_PATH/Discovery/Web-Content/raft-medium-words.txt"
     )
     
     local short_extensions_list=/tmp/dirbust.extensions.small.$RANDOM.$RANDOM.txt
@@ -177,27 +233,29 @@ function files_scan {
 
 .asp
 .aspx
-.asmx
-.cgi
-.htm
-.html
 .jsp
-.jspx
 .do
 .action
 .log
-.rb
 .py
 .php
-.pl
 .sh
 .sql
 .json
 .xml
-.rar
 .zip
 .db
-.sqlite
+.yml
+.txt
+.md
+.bak
+.old
+/
+EOF
+
+    # FIXME: Clobbering extensions list due to a too many entries being generated.
+    cat<<EOF>$short_extensions_list
+
 /
 EOF
 
@@ -213,11 +271,6 @@ EOF
         do
                 local wordlists=$(prefilter_wordlists $list)
                 scan "$URL/" "$wordlists" "$short_extensions_list"
-    
-                if [[ $wordlists == "/tmp/dirbust.wordlists."* ]]
-                then
-                    rm $wordlists
-                fi
         done
 
     else
@@ -225,15 +278,8 @@ EOF
         do
                 local wordlists=$(prefilter_wordlists $list)
                 scan "$URL/" "$wordlists" "$short_extensions_list"
-
-                if [[ $wordlists == "/tmp/dirbust.wordlists."* ]]
-                then
-                    rm $wordlists
-                fi
         done
     fi
-
-    rm $short_extensions_list
 }
 
 function generate_custom_words {
@@ -250,7 +296,7 @@ function generate_custom_words {
     done
 
     if [[ -n "$(which john)" ]]; then
-		echo "[?] Generating wordlists in john..."
+        echo "[?] Generating wordlists in john..."
         if [ $FULL_MODE -eq 0 ]; then
             john -w=$words_file --rules --stdout 2>/dev/null > $words_file2
         else
@@ -269,6 +315,11 @@ function generate_custom_words {
     fi
 }
 
+function cleanup() {
+    echo "[.] Cleaning up dirbust wordlists..."
+    rm -f /tmp/dirbust.*
+}
+
 # ====================================
 
 echo
@@ -277,9 +328,11 @@ echo -e "\t    To be used for quick dir busting pentest task"
 echo -e "\t    Mariusz B. / 16-19', v0.1"
 echo
 
+trap cleanup INT
+
 if [ ! -e $GOBUSTER_PATH ]; then
-	echo "[!] Could not find gobuster. Please set up GOBUSTER_PATH in the script correctly."
-	exit 1
+    echo "[!] Could not find gobuster. Please set up GOBUSTER_PATH in the script correctly."
+    exit 1
 fi
 
 while [[ $# -ge 1 ]]
@@ -337,6 +390,13 @@ do
                 exit
             ;;
 
+            -D|--dump-wordlist)
+                DUMP_FILE="$2"
+                echo > $DUMP_FILE
+                echo "[?] Only dumping generated wordlists."
+                shift
+            ;;
+
             -H|--showcode)
                 USER_SHOW_CODES="$2"
                 shift
@@ -367,16 +427,18 @@ if [ ! -d "$SECLISTS_PATH" ]; then
     exit
 fi
 
-if [[ -z "$URL" ]]; then
-    echo "[!] You did not specify a URL to scan."
+if [[ -z "$DUMP_FILE" ]] && [[ -z "$URL" ]]; then
+    echo "[!] You did not specify an URL to scan."
     usage
     exit
 fi
 
-out=$(curl --connect-timeout 10 -sD- $URL -o /dev/null)
-if [ $? -ne 0 ]; then
-    echo "[!] Could not fetch website from specified URL. Check your internet connection."
-    echo -e "[!] curl's output:\n\t$out"
+if [[ -n "$URL" ]]; then
+    out=$(curl --connect-timeout 10 -sD- $URL -o /dev/null)
+    if [ $? -ne 0 ]; then
+        echo "[!] Could not fetch website from specified URL. Check your internet connection."
+        echo -e "[!] curl's output:\n\t$out"
+    fi
 fi
 
 if [[ ! -z "$WORDLIST" ]]; then
@@ -424,5 +486,8 @@ else
     fi
 fi
 
+cleanup
+
 echo "Script has finished scanning."
+
 
